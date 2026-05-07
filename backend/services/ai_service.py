@@ -5,8 +5,8 @@ import os
 import re
 from functools import partial
 
-GEMINI_MODEL = "gemini-2.0-flash"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 SYSTEM_PROMPT = """Bạn là chuyên gia học bổng quốc tế và tư vấn du học, chuyên tổng hợp thông tin học bổng toàn phần bậc thạc sĩ trên toàn thế giới.
 
@@ -28,13 +28,17 @@ def _parse_json(text: str):
     text = text.strip()
     text = re.sub(r"^```(?:json)?\s*", "", text)
     text = re.sub(r"\s*```$", "", text)
+    # Try to extract JSON object if there's surrounding text
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        text = match.group()
     return json.loads(text.strip())
 
 
 def _call_api(country_name_en: str, country_name_vi: str) -> tuple[list[dict], dict, _Usage]:
-    api_key = os.getenv("GEMINI_API_KEY", "")
+    api_key = os.getenv("GROQ_API_KEY", "")
     if not api_key:
-        raise ValueError("GEMINI_API_KEY chưa được cấu hình trong biến môi trường")
+        raise ValueError("GROQ_API_KEY chưa được cấu hình trong biến môi trường")
 
     user_prompt = f"""Tổng hợp thông tin cho {country_name_en} ({country_name_vi}). Trả về JSON object với 2 key:
 
@@ -88,21 +92,29 @@ def _call_api(country_name_en: str, country_name_vi: str) -> tuple[list[dict], d
 }}"""
 
     payload = {
-        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-        "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
-        "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.3},
+        "model": GROQ_MODEL,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ],
+        "max_tokens": 8192,
+        "temperature": 0.3,
     }
 
     with httpx.Client(timeout=120) as client:
-        resp = client.post(f"{GEMINI_URL}?key={api_key}", json=payload)
+        resp = client.post(
+            GROQ_URL,
+            json=payload,
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
         resp.raise_for_status()
         result = resp.json()
 
-    raw = result["candidates"][0]["content"]["parts"][0]["text"]
-    meta = result.get("usageMetadata", {})
+    raw = result["choices"][0]["message"]["content"]
+    usage_meta = result.get("usage", {})
     usage = _Usage(
-        input_tokens=meta.get("promptTokenCount", 0),
-        output_tokens=meta.get("candidatesTokenCount", 0),
+        input_tokens=usage_meta.get("prompt_tokens", 0),
+        output_tokens=usage_meta.get("completion_tokens", 0),
     )
     data = _parse_json(raw)
     return data.get("scholarships", []), data.get("living_info", {}), usage
