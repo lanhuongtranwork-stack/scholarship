@@ -1,6 +1,6 @@
 """Seed countries table with ISO 3166-1 data."""
 import asyncio
-import selectors
+import sys
 from sqlalchemy import text
 from database import AsyncSessionLocal
 
@@ -233,4 +233,8 @@ async def seed():
 
 
 if __name__ == "__main__":
-    asyncio.run(seed(), loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector()))
+    if sys.platform == "win32":
+        import selectors
+        asyncio.run(seed(), loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector()))
+    else:
+        asyncio.run(seed())

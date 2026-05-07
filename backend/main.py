@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import asyncio
 import logging
 import os
 
@@ -12,33 +11,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def _run_migrations():
-    from alembic.config import Config
-    from alembic import command
-    cfg = Config("alembic.ini")
-    command.upgrade(cfg, "head")
-
-
-async def _seed():
-    from seed_countries import seed
-    await seed()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    try:
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, _run_migrations)
-        logger.info("Migrations done.")
-    except Exception as e:
-        logger.error(f"Migration failed: {e}")
-
-    try:
-        await _seed()
-        logger.info("Seed done.")
-    except Exception as e:
-        logger.error(f"Seed failed: {e}")
-
     logger.info("Startup complete — ready to serve.")
     yield
 
