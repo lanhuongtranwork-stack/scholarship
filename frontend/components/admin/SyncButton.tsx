@@ -54,10 +54,13 @@ export default function SyncButton({ countryCode, onDone }: Props) {
         {isRunning ? '⏳ Đang sync...' : '🔄 Đồng bộ'}
       </button>
       {status && status.status !== 'running' && (
-        <span className={`text-xs ${status.status === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+        <span
+          className={`text-xs ${status.status === 'success' ? 'text-green-600' : 'text-red-500'}`}
+          title={status.error_message || undefined}
+        >
           {status.status === 'success'
             ? `✓ ${status.scholarships_upserted} học bổng`
-            : `✗ Lỗi`}
+            : `✗ Lỗi${status.error_message ? ': ' + status.error_message.slice(0, 60) : ''}`}
         </span>
       )}
     </div>
