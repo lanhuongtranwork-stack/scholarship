@@ -1,4 +1,4 @@
-import anthropic
+import google.generativeai as genai
 import asyncio
 import json
 import os
@@ -14,25 +14,39 @@ QUY TẮC BẮT BUỘC:
 4. Không bịa thông tin — nếu không biết deadline cụ thể ghi "Thường vào tháng X hàng năm".
 5. Trả về JSON thuần túy, không thêm text ngoài JSON."""
 
+GEMINI_MODEL = "gemini-2.0-flash"
 
-def _get_client() -> anthropic.Anthropic:
-    """Create client at call time so it always reads the current env var."""
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+
+class _Usage:
+    def __init__(self, input_tokens: int, output_tokens: int):
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+
+
+def _get_model():
+    api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY chưa được cấu hình trong file .env")
-    return anthropic.Anthropic(api_key=api_key)
+        raise ValueError("GEMINI_API_KEY chưa được cấu hình trong biến môi trường")
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel(
+        model_name=GEMINI_MODEL,
+        system_instruction=SYSTEM_PROMPT,
+        generation_config=genai.types.GenerationConfig(
+            max_output_tokens=8192,
+            temperature=0.3,
+        ),
+    )
 
 
-def _parse_json(text: str) -> any:
+def _parse_json(text: str):
     text = text.strip()
     text = re.sub(r"^```(?:json)?\s*", "", text)
     text = re.sub(r"\s*```$", "", text)
     return json.loads(text.strip())
 
 
-def _call_api(country_name_en: str, country_name_vi: str) -> tuple[list[dict], dict, any]:
-    """Synchronous Anthropic call — run in thread pool to avoid blocking event loop."""
-    client = _get_client()
+def _call_api(country_name_en: str, country_name_vi: str) -> tuple[list[dict], dict, _Usage]:
+    model = _get_model()
 
     user_prompt = f"""Tổng hợp thông tin cho {country_name_en} ({country_name_vi}). Trả về JSON object với 2 key:
 
@@ -85,22 +99,14 @@ def _call_api(country_name_en: str, country_name_vi: str) -> tuple[list[dict], d
   "data_confidence": "high" | "medium" | "low"
 }}"""
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=8192,
-        system=[
-            {
-                "type": "text",
-                "text": SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
-        messages=[{"role": "user", "content": user_prompt}],
-    )
-
-    usage = response.usage
-    raw = response.content[0].text
+    response = model.generate_content(user_prompt)
+    raw = response.text
     data = _parse_json(raw)
+
+    usage = _Usage(
+        input_tokens=response.usage_metadata.prompt_token_count or 0,
+        output_tokens=response.usage_metadata.candidates_token_count or 0,
+    )
     return data.get("scholarships", []), data.get("living_info", {}), usage
 
 
@@ -108,8 +114,7 @@ async def fetch_country_data(
     country_code: str,
     country_name_en: str,
     country_name_vi: str,
-) -> tuple[list[dict], dict, any]:
-    """Fetch scholarships + living info. Runs sync Anthropic call in thread pool."""
+) -> tuple[list[dict], dict, _Usage]:
     loop = asyncio.get_event_loop()
     fn = partial(_call_api, country_name_en, country_name_vi)
     return await loop.run_in_executor(None, fn)

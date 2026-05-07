@@ -132,7 +132,7 @@ async def run_sync(log_id: int, country_code: str, name_en: str, name_vi: str):
                     status="success",
                     scholarships_found=len(scholarships_raw),
                     scholarships_upserted=upserted,
-                    claude_model="claude-sonnet-4-6",
+                    claude_model="gemini-2.0-flash",
                     prompt_tokens=usage.input_tokens,
                     completion_tokens=usage.output_tokens,
                     duration_seconds=duration,

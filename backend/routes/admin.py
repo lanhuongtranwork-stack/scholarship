@@ -125,5 +125,5 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 
 @router.get("/api-key-status")
 async def get_api_key_status():
-    key = os.getenv("ANTHROPIC_API_KEY", "")
+    key = os.getenv("GEMINI_API_KEY", "")
     return {"configured": bool(key), "prefix": key[:10] + "..." if len(key) > 10 else ""}
