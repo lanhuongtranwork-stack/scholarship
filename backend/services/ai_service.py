@@ -1,9 +1,12 @@
-import google.generativeai as genai
+import httpx
 import asyncio
 import json
 import os
 import re
 from functools import partial
+
+GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1/models/{GEMINI_MODEL}:generateContent"
 
 SYSTEM_PROMPT = """Bạn là chuyên gia học bổng quốc tế và tư vấn du học, chuyên tổng hợp thông tin học bổng toàn phần bậc thạc sĩ trên toàn thế giới.
 
@@ -14,28 +17,11 @@ QUY TẮC BẮT BUỘC:
 4. Không bịa thông tin — nếu không biết deadline cụ thể ghi "Thường vào tháng X hàng năm".
 5. Trả về JSON thuần túy, không thêm text ngoài JSON."""
 
-GEMINI_MODEL = "gemini-1.5-flash"
-
 
 class _Usage:
     def __init__(self, input_tokens: int, output_tokens: int):
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
-
-
-def _get_model():
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY chưa được cấu hình trong biến môi trường")
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel(
-        model_name=GEMINI_MODEL,
-        system_instruction=SYSTEM_PROMPT,
-        generation_config=genai.types.GenerationConfig(
-            max_output_tokens=8192,
-            temperature=0.3,
-        ),
-    )
 
 
 def _parse_json(text: str):
@@ -46,7 +32,9 @@ def _parse_json(text: str):
 
 
 def _call_api(country_name_en: str, country_name_vi: str) -> tuple[list[dict], dict, _Usage]:
-    model = _get_model()
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY chưa được cấu hình trong biến môi trường")
 
     user_prompt = f"""Tổng hợp thông tin cho {country_name_en} ({country_name_vi}). Trả về JSON object với 2 key:
 
@@ -99,14 +87,24 @@ def _call_api(country_name_en: str, country_name_vi: str) -> tuple[list[dict], d
   "data_confidence": "high" | "medium" | "low"
 }}"""
 
-    response = model.generate_content(user_prompt)
-    raw = response.text
-    data = _parse_json(raw)
+    payload = {
+        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+        "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.3},
+    }
 
+    with httpx.Client(timeout=120) as client:
+        resp = client.post(f"{GEMINI_URL}?key={api_key}", json=payload)
+        resp.raise_for_status()
+        result = resp.json()
+
+    raw = result["candidates"][0]["content"]["parts"][0]["text"]
+    meta = result.get("usageMetadata", {})
     usage = _Usage(
-        input_tokens=response.usage_metadata.prompt_token_count or 0,
-        output_tokens=response.usage_metadata.candidates_token_count or 0,
+        input_tokens=meta.get("promptTokenCount", 0),
+        output_tokens=meta.get("candidatesTokenCount", 0),
     )
+    data = _parse_json(raw)
     return data.get("scholarships", []), data.get("living_info", {}), usage
 
 
