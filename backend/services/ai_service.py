@@ -5,7 +5,7 @@ import os
 import re
 from functools import partial
 
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-2.0-flash"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 SYSTEM_PROMPT = """Bạn là chuyên gia học bổng quốc tế và tư vấn du học, chuyên tổng hợp thông tin học bổng toàn phần bậc thạc sĩ trên toàn thế giới.

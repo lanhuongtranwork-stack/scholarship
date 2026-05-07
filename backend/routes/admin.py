@@ -87,13 +87,22 @@ async def sync_all(
     result = await db.execute(query)
     countries = result.scalars().all()
 
+    logs = []
     for c in countries:
         log = SyncLog(country_code=c.code, status="running", triggered_by="admin_bulk")
         db.add(log)
         await db.flush()
-        background_tasks.add_task(run_sync, log.id, c.code, c.name_en, c.name_vi)
+        logs.append((log.id, c.code, c.name_en, c.name_vi))
 
     await db.commit()
+
+    async def _run_sequential():
+        import asyncio
+        for log_id, code, name_en, name_vi in logs:
+            await run_sync(log_id, code, name_en, name_vi)
+            await asyncio.sleep(5)  # 5s gap to stay under 15 RPM free tier limit
+
+    background_tasks.add_task(_run_sequential)
     label = continent or "toàn thế giới"
     return {"message": f"Đã lên lịch đồng bộ {len(countries)} quốc gia ({label})", "total_countries": len(countries)}
 
