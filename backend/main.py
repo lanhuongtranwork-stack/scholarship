@@ -8,39 +8,38 @@ import os
 
 load_dotenv()
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-async def _run_migrations():
-    try:
-        import selectors
-        from alembic.config import Config
-        from alembic import command
-
-        def _migrate():
-            cfg = Config("alembic.ini")
-            command.upgrade(cfg, "head")
-
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, _migrate)
-        logger.info("Migrations completed.")
-    except Exception as e:
-        logger.error(f"Migration error (non-fatal): {e}")
+def _run_migrations():
+    from alembic.config import Config
+    from alembic import command
+    cfg = Config("alembic.ini")
+    command.upgrade(cfg, "head")
 
 
 async def _seed():
-    try:
-        from seed_countries import seed
-        await seed()
-        logger.info("Seed completed.")
-    except Exception as e:
-        logger.error(f"Seed error (non-fatal): {e}")
+    from seed_countries import seed
+    await seed()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await _run_migrations()
-    await _seed()
+    try:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, _run_migrations)
+        logger.info("Migrations done.")
+    except Exception as e:
+        logger.error(f"Migration failed: {e}")
+
+    try:
+        await _seed()
+        logger.info("Seed done.")
+    except Exception as e:
+        logger.error(f"Seed failed: {e}")
+
+    logger.info("Startup complete — ready to serve.")
     yield
 
 
