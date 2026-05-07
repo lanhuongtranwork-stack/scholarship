@@ -14,7 +14,7 @@ QUY TẮC BẮT BUỘC:
 4. Không bịa thông tin — nếu không biết deadline cụ thể ghi "Thường vào tháng X hàng năm".
 5. Trả về JSON thuần túy, không thêm text ngoài JSON."""
 
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-1.5-flash"
 
 
 class _Usage:
