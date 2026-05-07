@@ -6,7 +6,7 @@ import re
 from functools import partial
 
 GEMINI_MODEL = "gemini-1.5-flash"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1/models/{GEMINI_MODEL}:generateContent"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 SYSTEM_PROMPT = """Bạn là chuyên gia học bổng quốc tế và tư vấn du học, chuyên tổng hợp thông tin học bổng toàn phần bậc thạc sĩ trên toàn thế giới.
 
@@ -88,7 +88,7 @@ def _call_api(country_name_en: str, country_name_vi: str) -> tuple[list[dict], d
 }}"""
 
     payload = {
-        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
         "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
         "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.3},
     }
