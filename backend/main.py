@@ -36,6 +36,11 @@ app.include_router(scholarships.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Bản Đồ Học Bổng API", "docs": "/docs", "health": "/api/health"}
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "message": "Bản Đồ Học Bổng API đang chạy"}
